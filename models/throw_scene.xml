@@ -1,0 +1,48 @@
+<mujoco model="g1_throw">
+  <include file="../mujoco_menagerie/unitree_g1/g1.xml"/>
+
+  <!-- must come AFTER the include to override g1's own meshdir -->
+  <compiler meshdir="../mujoco_menagerie/unitree_g1/assets/"/>
+
+  <worldbody>
+    <light pos="0 0 4" dir="0 0 -1"/>
+    <geom name="floor" type="plane" size="20 20 0.1"
+          contype="1" conaffinity="3" rgba="0.3 0.3 0.35 1"/>
+
+    <!-- side view: judges arc height and release angle -->
+    <camera name="side" pos="1.5 -5 1.5" xyaxes="1 0 0  0 0.3 1"/>
+
+    <!-- behind the robot, looking down-range: judges left/right aim -->
+    <camera name="behind" pos="-2.5 0 1.8" xyaxes="0 -1 0  0.3 0 1"/>
+
+    <!-- placeholder position; the real spawn is set from Python at reset,
+         computed as hand_pos + OFFSET so the weld starts unstretched -->
+    <body name="ball" pos="-0.017 -0.222 0.721">
+      <freejoint name="ball_free"/>
+      <geom name="ball_geom" type="sphere" size="0.02" mass="0.05"
+            contype="2" conaffinity="2" rgba="1 0.4 0.1 1"/>
+    </body>
+
+    <!-- where we want the ball to land -->
+    <site name="target" pos="4 0 0.01" type="cylinder" size="0.3 0.005"
+          rgba="0 1 0 0.5"/>
+  </worldbody>
+
+  <equality>
+    <!-- holds the pelvis still so the robot can't fall while we
+         debug the throw. Disable later via d.eq_active. -->
+    <weld name="pin_base" body1="pelvis" solref="0.001 1"/>
+
+    <!-- the "grip". Turning this off IS the release. -->
+    <weld name="grip" body1="right_wrist_yaw_link" body2="ball"
+          relpose="0.145 0 0 1 0 0 0" solref="0.001 1"/>
+  </equality>
+
+  <!-- default camera framing; must come after the include so it
+       overrides the one inside g1.xml -->
+  <statistic center="1.5 0 0.8" extent="10"/>
+
+  <visual>
+    <global azimuth="140" elevation="-15"/>
+  </visual>
+</mujoco>
