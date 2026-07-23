@@ -1,0 +1,18 @@
+{
+  "algorithm": "TD3",
+  "target": [
+    4.0,
+    0.0
+  ],
+  "action_joints": [
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_elbow_joint"
+  ],
+  "release_time_range": [
+    0.72,
+    0.84
+  ],
+  "seed": 0,
+  "reward": "landing-error reduction only"
+}

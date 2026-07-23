@@ -1,12 +1,15 @@
-﻿# G1 Whole-Body Throwing
+﻿# G1 TD3 Throwing
 
-RL controller that throws a ball at a commanded target using the Unitree G1
-in MuJoCo. The policy outputs joint residuals around the standing pose plus
-a continuous release signal.
+TD3 controller that throws a ball to a specified target using the Unitree G1
+in MuJoCo. The policy controls the right shoulder pitch/roll, right elbow, and
+a continuous release signal. Other joints hold the standing pose.
+
+The reward has exactly one objective: reduce the final XY landing error. It
+contains no posture, energy, speed, survival, release, or terminal bonus/penalty.
 
 ## Setup
 
-    git clone --recurse-submodules https://github.com/aliemreo/g1-throwing.git
+    git clone --recurse-submodules https://github.com/<you>/g1-throwing.git
     cd g1-throwing
     python -m venv .venv
     .venv\Scripts\Activate.ps1        # Windows
@@ -29,17 +32,22 @@ Windows: if venv activation is blocked, run once:
 Expect a ~0.56 m miss. This replays a hand-tuned swing and serves as the
 regression test - if the number changes, something in the physics layer broke.
 
-## Train
+## Train TD3 for a specified target
 
-    python train_ppo.py --easy --envs 12 --steps 3000000
-    tensorboard --logdir runs/throw_v1/tb
+    cd train
+    python train_td3.py --target 4 0 --steps 1000000
+    tensorboard --logdir runs/td3_target_4_0/tb
 
-Watch `throw/mean_miss`, not reward. Reward is not comparable across episodes
-because distant targets give the shaping term more room to accumulate.
+Watch `throw/mean_miss` in TensorBoard. `best_model.zip` is updated from a
+rolling 100-episode mean, while `final.zip` is always written when training
+stops. Use `--resume PATH_TO_ZIP` to continue a run.
 
-Set --envs to your physical core count.
+TD3 is off-policy and uses one MuJoCo environment so replay updates stay
+well-defined and reproducible.
 
 ## Evaluate
 
-    python eval_policy.py --run throw_v1 --episodes 50
-    python eval_policy.py --run throw_v1 --view
+    python eval_td3.py --run td3_target_4_0 --episodes 50
+    python eval_td3.py --run td3_target_4_0 --view
+
+The original PPO entry point remains available as `train_ppo.py`.
