@@ -6,7 +6,7 @@ a continuous release signal.
 
 ## Setup
 
-    git clone --recurse-submodules https://github.com/<you>/g1-throwing.git
+    git clone --recurse-submodules https://github.com/aliemreo/g1-throwing.git
     cd g1-throwing
     python -m venv .venv
     .venv\Scripts\Activate.ps1        # Windows
