@@ -1,73 +1,73 @@
-# G1 Walking + Throwing（Level 3）
+# G1 Walking + Throwing (Level 3)
 
-这个项目实现 Unitree G1 在持续向前行走的过程中投球：
+This project enables the Unitree G1 to throw a ball while continuously walking forward:
 
-1. 机器人先稳定行走约 1.4 秒；
-2. 投球动作期间继续保持正向速度；
-3. 球释放后继续沿直线行走；
-4. 预训练 LSTM 控制 12 个腿关节；
-5. TD3 学习投球、释放时刻和全身平衡 residual；
-6. 骨盆不固定。
+1. The robot first establishes a stable walking gait for approximately 1.4 seconds.
+2. It maintains positive forward velocity throughout the throwing motion.
+3. After releasing the ball, it continues walking in a straight line.
+4. A pretrained LSTM policy controls the 12 leg joints.
+5. TD3 learns residual actions for throwing, release timing, and whole-body balance.
+6. The pelvis is not fixed.
 
-行走策略来自
-[HusseinLezzaik/unitree-g1-bipedal-rl-walk](https://github.com/HusseinLezzaik/unitree-g1-bipedal-rl-walk)，
-许可证信息见 `THIRD_PARTY_NOTICES.md`。
+The walking policy is based on
+[HusseinLezzaik/unitree-g1-bipedal-rl-walk](https://github.com/HusseinLezzaik/unitree-g1-bipedal-rl-walk).
+See `THIRD_PARTY_NOTICES.md` for license information.
 
-## 已验证的默认结果
+## Verified Default Results
 
-默认目标为 `(4, 0)`，前进指令为 `1.3 m/s`，每回合 5 秒。
+The default target is `(4, 0)`, the commanded forward velocity is `1.3 m/s`, and each episode lasts 5 seconds.
 
-`td3_walk_throw_4_0_vx1p3/best_model.zip` 的 10 回合测试结果：
+Results from a 10-episode evaluation of `td3_walk_throw_4_0_vx1p3/best_model.zip`:
 
-| 指标 | 结果 |
+| Metric | Result |
 |---|---:|
-| 平均落点误差 | 0.051 m |
-| 0.50 m 内命中率 | 100% |
-| 投球前前进距离 | 0.707 m |
-| 投球中前进距离 | 0.881 m |
-| 投球后前进距离 | 2.555 m |
-| 投球期间正向运动比例 | 100% |
-| 投球期间最低前向速度 | 0.383 m/s |
-| 总前进距离 | 4.143 m |
-| 最终横向漂移 | 0.002 m |
-| 最大直线误差 | 0.166 m |
-| 摔倒率 | 0% |
+| Mean landing error | 0.051 m |
+| Hit rate within 0.50 m | 100% |
+| Distance traveled before the throw | 0.707 m |
+| Distance traveled during the throw | 0.881 m |
+| Distance traveled after the throw | 2.555 m |
+| Positive-motion fraction during the throw | 100% |
+| Minimum forward velocity during the throw | 0.383 m/s |
+| Total forward distance | 4.143 m |
+| Final lateral drift | 0.002 m |
+| Maximum line-tracking error | 0.166 m |
+| Fall rate | 0% |
 
-## 快速检查
+## Quick Check
 
 ```powershell
 cd C:\Users\25954\Documents\ADC_Project\basic-test\g1-throwing-walking
 C:\Users\25954\anaconda3\envs\mujo_torch\python.exe train\check_walk_integration.py
 ```
 
-## 查看训练结果
+## Evaluate the Trained Policy
 
-统计 50 回合：
+Run a 50-episode evaluation:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\eval.ps1 `
   --run td3_walk_throw_4_0_vx1p3 --episodes 50
 ```
 
-打开 MuJoCo 动画：
+Open the MuJoCo viewer:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\eval.ps1 `
   --run td3_walk_throw_4_0_vx1p3 --view --cam follow
 ```
 
-评估输出会分别显示：
+The evaluation output reports:
 
-- `before throw`：投球开始前的前进距离；
-- `during throw`：完整投球动作期间的前进距离；
-- `after throw`：投球结束后的前进距离；
-- `moving in throw`：投球期间正向速度所占比例；
-- `min throw vx`：投球期间最低前向速度；
-- `max line error`：相对目标直线的最大横向误差。
+- `before throw`: forward distance traveled before the throwing motion starts;
+- `during throw`: forward distance traveled throughout the complete throwing motion;
+- `after throw`: forward distance traveled after the throwing motion ends;
+- `moving in throw`: fraction of the throwing period with positive forward velocity;
+- `min throw vx`: minimum forward velocity during the throwing period;
+- `max line error`: maximum lateral deviation from the target line.
 
-## RTX 4060 GPU 训练
+## Training on an RTX 4060 GPU
 
-第一阶段只训练右臂和释放时刻：
+In the first stage, train only the right arm and release timing:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\train_gpu.ps1 `
@@ -77,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File .\train_gpu.ps1 `
   --resume train\runs\td3_walk_throw_4_0_vx1p3\best_model.zip
 ```
 
-第一阶段稳定后，解锁腿部、腰部和左臂平衡 residual：
+After the first stage becomes stable, unlock the leg, waist, and left-arm balance residuals:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\train_gpu.ps1 `
@@ -87,23 +87,23 @@ powershell -ExecutionPolicy Bypass -File .\train_gpu.ps1 `
   --resume train\runs\td3_walk_throw_4_0_vx1p3\best_model.zip
 ```
 
-训练默认配置：
+Default training configuration:
 
-- TD3 网络使用 CUDA；
-- 4 个并行 MuJoCo 子进程；
-- MuJoCo 500 Hz、控制策略 50 Hz；
-- `--learning-starts 0`，避免全范围随机动作破坏步态；
-- 学习率 `1e-5`，对强 warm-start 做保守微调；
-- `best_model.zip` 只有综合指标真正改善时才会覆盖。
+- The TD3 networks run on CUDA.
+- Four MuJoCo worker processes run in parallel.
+- MuJoCo runs at 500 Hz and the control policy at 50 Hz.
+- `--learning-starts 0` prevents full-range random actions from disrupting the gait.
+- The learning rate is `1e-5` for conservative fine-tuning from the strong warm start.
+- `best_model.zip` is overwritten only when the aggregate evaluation metrics genuinely improve.
 
-TensorBoard：
+TensorBoard:
 
 ```powershell
 C:\Users\25954\anaconda3\envs\mujo_torch\Scripts\tensorboard.exe `
   --logdir train\runs
 ```
 
-重点观察：
+Key metrics to monitor:
 
 - `level3/mean_miss`
 - `level3/fall_rate`
@@ -111,23 +111,22 @@ C:\Users\25954\anaconda3\envs\mujo_torch\Scripts\tensorboard.exe `
 - `level3/mean_max_abs_lateral_error`
 - `level3_eval/positive_velocity_fraction_during_throw`
 
-## 控制结构
+## Control Architecture
 
-TD3 使用 24 维 residual 动作：
+TD3 produces a 24-dimensional residual action:
 
-| 范围 | 内容 |
+| Range | Function |
 |---|---|
-| 0–11 | 12 个腿关节 residual |
-| 12–14 | 腰部 yaw/roll/pitch residual |
-| 15–18 | 左臂 residual |
-| 19–22 | 右臂 residual |
-| 23 | 释放时间 residual |
+| 0–11 | Residuals for the 12 leg joints |
+| 12–14 | Waist yaw/roll/pitch residuals |
+| 15–18 | Left-arm residuals |
+| 19–22 | Right-arm residuals |
+| 23 | Release-timing residual |
 
-腿部最终目标：
+The final leg-joint target is:
 
 ```text
 pretrained_walk_target + 0.06 rad * td3_leg_residual
 ```
 
-行走策略的速度指令还会经过横向位置和航向闭环修正，使机器人回到
-reset 时确定的前向直线上。
+The walking policy's velocity command is also corrected by closed-loop lateral-position and heading feedback, guiding the robot back toward the forward line established at reset.
