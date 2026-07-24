@@ -7,13 +7,16 @@ to debug. Wrap it later for SB3 / Brax.
 Design notes:
   - Actions are RESIDUALS around the 'stand' keyframe, so a zero action means
     "hold the standing pose". Random init therefore produces near-sane motion.
-  - Action vector is length 30: 29 joint offsets + 1 release signal.
-  - The release fires on a zero-crossing of action[29], interpolated to
-    sub-step precision. Landing point moves ~0.4 m per 2 ms of release timing,
-    so coarse release resolution would make aiming impossible.
-  - Reward is potential-based shaping (Ng 1999) on the predicted landing
-    point, plus a terminal accuracy bonus. Shaping cannot change the optimal
-    policy, only how fast it is found.
+  - Action vector is length 30: 29 joint offsets + 1 release control.
+  - By default release fires on a zero-crossing of action[29], interpolated to
+    sub-step precision. For TD3, release_time_range maps the initial continuous
+    release action to an absolute release time, which is substantially easier
+    for a deterministic policy to optimise than a discontinuous zero-crossing.
+  - Reward contains exactly one objective: landing accuracy. During flight it
+    is expressed as improvement in predicted landing error; at episode end the
+    potential is replaced by the actual landing/current ball error. The sum of
+    undiscounted rewards is therefore initial_error - final_error. There are no
+    pose, energy, speed, survival, release, or terminal-bonus terms.
 """
 
 import numpy as np
@@ -51,6 +54,7 @@ class ThrowEnv:
                  target_theta=(-0.5, 0.5),
                  fixed_target=None,
                  freeze_legs=True,
+                 release_time_range=None,
                  seed=None):
         """
         target_r / target_theta : sampling ranges. Narrow them for curriculum.
@@ -70,6 +74,11 @@ class ThrowEnv:
         self.target_r = target_r
         self.target_theta = target_theta
         self.fixed_target = fixed_target
+        self.release_time_range = release_time_range
+        if release_time_range is not None:
+            if (len(release_time_range) != 2
+                    or release_time_range[0] >= release_time_range[1]):
+                raise ValueError("release_time_range must be (minimum, maximum)")
 
         m = self.m
         self.hand = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY,
@@ -127,10 +136,15 @@ class ThrowEnv:
         t = (v[2] + np.sqrt(disc)) / G
         return p[:2] + v[:2] * t
 
-    def _phi(self):
-        """Potential: negative distance from predicted landing to target."""
-        d = np.linalg.norm(self.predicted_landing() - self.target[:2])
-        return -min(d, 10.0)
+    def _landing_potential(self):
+        """Negative target error if the ball were released at this instant."""
+        error = np.linalg.norm(self.predicted_landing() - self.target[:2])
+        return -float(error)
+
+    def _actual_potential(self):
+        """Negative target error of the ball's current/landed XY position."""
+        pos = self.landed if self.landed is not None else self._ball_pos()
+        return -float(np.linalg.norm(pos[:2] - self.target[:2]))
 
     def _obs(self):
         d, m = self.d, self.m
@@ -178,7 +192,8 @@ class ThrowEnv:
         self.hand_speed = 0.0
         self.step_i = 0
         self.prev_signal = -1.0
-        self.phi_prev = self._phi()
+        self.scheduled_release_time = None
+        self.phi_prev = self._landing_potential()
 
         return self._obs(), {}
 
@@ -192,10 +207,23 @@ class ThrowEnv:
         d.ctrl[:] = np.clip(ctrl, m.actuator_ctrlrange[:, 0],
                             m.actuator_ctrlrange[:, 1])
 
-        # --- release: zero-crossing, resolved to a sub-step -----------
+        # --- release, resolved to a simulator sub-step ----------------
         signal = action[m.nu]
         release_at = None
-        if not self.released and self.prev_signal < 0 <= signal:
+        if self.release_time_range is not None:
+            if self.scheduled_release_time is None:
+                lo, hi = self.release_time_range
+                self.scheduled_release_time = (
+                    lo + (signal + 1.0) * 0.5 * (hi - lo))
+            if not self.released:
+                until_release = self.scheduled_release_time - d.time
+                horizon = self.decimation * m.opt.timestep
+                if until_release < horizon:
+                    release_at = int(np.clip(
+                        np.ceil(max(until_release - 1e-9, 0.0)
+                                / m.opt.timestep),
+                        0, self.decimation - 1))
+        elif not self.released and self.prev_signal < 0 <= signal:
             frac = -self.prev_signal / (signal - self.prev_signal + 1e-9)
             release_at = int(np.clip(frac * self.decimation,
                                      0, self.decimation - 1))
@@ -219,26 +247,31 @@ class ThrowEnv:
 
         self.step_i += 1
 
-        # --- reward ----------------------------------------------------
-        phi = self._phi()
-        reward = phi - self.phi_prev      # telescopes to phi_final - phi_initial
-        self.phi_prev = phi
-
         terminated = self.landed is not None
         truncated = self.step_i >= self.max_steps
 
-        if terminated:
-            miss = np.linalg.norm(self.landed[:2] - self.target[:2])
-            reward += 10.0 * np.exp(-miss ** 2 / 0.5)   # terminal accuracy
-        elif truncated and not self.released:
-            reward -= 5.0                               # never let go
+        # This is the only reward signal: reduction in target error. Use the
+        # ballistic landing prediction while acting, then the actual ball
+        # position at the end. With gamma=1 the episode return telescopes to
+        # initial_error - final_error, so no auxiliary objective is hidden in
+        # the shaping.
+        phi = (self._actual_potential() if terminated or truncated
+               else self._landing_potential())
+        reward = phi - self.phi_prev
+        self.phi_prev = phi
+
+        landing_miss = (float(np.linalg.norm(
+            self.landed[:2] - self.target[:2]))
+            if self.landed is not None else None)
+        objective_miss = -phi if terminated or truncated else None
 
         info = {"landed": self.landed,
                 "released": self.released,
                 "hand_speed": self.hand_speed,
                 "launch_vel": self.launch_vel,
+                "scheduled_release_time": self.scheduled_release_time,
                 "target": self.target[:2].copy(),
-                "miss": (np.linalg.norm(self.landed[:2] - self.target[:2])
-                         if self.landed is not None else None)}
+                "miss": landing_miss,
+                "objective_miss": objective_miss}
 
         return self._obs(), reward, terminated, truncated, info

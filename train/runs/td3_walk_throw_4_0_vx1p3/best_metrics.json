@@ -1,0 +1,10 @@
+{
+  "selection_score": 0.050992444183688666,
+  "mean_miss": 0.050992444183688666,
+  "fall_rate": 0.0,
+  "mean_distance_walked": 4.143474751402839,
+  "distance_during_throw": 0.8813671446914093,
+  "positive_velocity_fraction_during_throw": 1.0,
+  "max_abs_lateral_error": 0.16550942272942998,
+  "source": "zero-residual initial controller"
+}

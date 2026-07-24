@@ -1,0 +1,61 @@
+{
+  "algorithm": "TD3",
+  "task": "walk forward while throwing to a marked target",
+  "target": [
+    4.0,
+    0.0
+  ],
+  "random_target": false,
+  "target_r": [
+    3.0,
+    5.0
+  ],
+  "target_theta": [
+    -0.25,
+    0.25
+  ],
+  "command": [
+    1.3,
+    0.0,
+    0.0
+  ],
+  "throw_start": 1.4,
+  "stage": "throw",
+  "max_seconds": 5.0,
+  "walk_policy": "pretrained\\g1_walk_policy_lstm.pt",
+  "walk_policy_device": "cpu",
+  "num_envs": 4,
+  "vec_env": "subproc",
+  "td3_device": "cuda",
+  "accelerator": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "torch": "2.14.0.dev20260722+cu132",
+  "python": "3.12.13",
+  "action_groups": {
+    "leg_residual": [
+      0,
+      12
+    ],
+    "waist_residual": [
+      12,
+      15
+    ],
+    "left_arm_residual": [
+      15,
+      19
+    ],
+    "right_arm_residual": [
+      19,
+      23
+    ],
+    "release_time": [
+      23,
+      24
+    ]
+  },
+  "action_count": 24,
+  "learning_rate": 1e-05,
+  "batch_size": 256,
+  "buffer_size": 100000,
+  "learning_starts": 0,
+  "seed": 0
+}
