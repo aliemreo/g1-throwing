@@ -25,6 +25,8 @@ m = mujoco.MjModel.from_xml_path(str(path))
 hand   = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "right_wrist_yaw_link")
 grip   = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_EQUALITY, "grip")
 bj     = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "ball_free")
+ball_geom = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "ball_geom")
+ball_radius = float(m.geom_size[ball_geom, 0])
 ball_q = m.jnt_qposadr[bj]
 ball_v = m.jnt_dofadr[bj]
 target = m.site_pos[mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "target")]
@@ -113,7 +115,8 @@ def run(letgo, swing=T_SWING, view=False, cam=None, verbose=False):
         if capture:                          # ball is free now
             state["vel"] = d.qvel[ball_v:ball_v+3].copy()
 
-        if state["released"] and state["landed"] is None and d.qpos[ball_q+2] < 0.025:
+        if (state["released"] and state["landed"] is None
+                and d.qpos[ball_q+2] < ball_radius + 0.005):
             state["landed"] = d.qpos[ball_q:ball_q+3].copy()
             if verbose:
                 dist = np.linalg.norm(state["landed"][:2] - target[:2])

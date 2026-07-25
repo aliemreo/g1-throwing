@@ -1,0 +1,79 @@
+{
+  "algorithm": "TD3",
+  "task": "learn a shot-put while continuously walking forward",
+  "controller_design": "pretrained RL walking policy plus learned TD3 shot-put",
+  "nominal_throw_trajectory": false,
+  "calibrated_throw_offsets": false,
+  "untrained_actor_behavior": "neutral arm; release occurs in the exploration window",
+  "target": [
+    4.0,
+    0.0
+  ],
+  "random_target": false,
+  "target_r": [
+    3.5,
+    4.5
+  ],
+  "target_theta": [
+    -0.1,
+    0.1
+  ],
+  "command": [
+    1.3,
+    0.0,
+    0.0
+  ],
+  "throw_start": 1.4,
+  "prep_duration": 0.7,
+  "release_delay": [
+    0.12,
+    0.55
+  ],
+  "stage": "arm",
+  "max_seconds": 3.8,
+  "walk_policy": "pretrained\\g1_walk_policy_lstm.pt",
+  "walk_policy_device": "cpu",
+  "num_envs": 1,
+  "vec_env": "dummy",
+  "td3_device": "cuda",
+  "accelerator": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "torch": "2.14.0.dev20260722+cu132",
+  "python": "3.12.13",
+  "action_groups": {
+    "leg_balance_residual": [
+      0,
+      12
+    ],
+    "waist_residual": [
+      12,
+      15
+    ],
+    "left_arm_balance": [
+      15,
+      19
+    ],
+    "right_arm_absolute_target": [
+      19,
+      23
+    ],
+    "release_time": [
+      23,
+      24
+    ]
+  },
+  "action_count": 24,
+  "learning_rate": 0.0003,
+  "batch_size": 64,
+  "buffer_size": 5000,
+  "learning_starts": 64,
+  "eval_freq": 150,
+  "eval_episodes": 1,
+  "min_best_steps": 150,
+  "min_improvement": 0.05,
+  "min_style_score": 0.35,
+  "min_style_valid_rate": 0.4,
+  "min_landed_rate": 0.6,
+  "max_fall_rate": 0.2,
+  "seed": 0,
+  "resume": null
+}

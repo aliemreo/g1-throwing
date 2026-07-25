@@ -19,7 +19,8 @@
          computed as hand_pos + OFFSET so the weld starts unstretched -->
     <body name="ball" pos="-0.017 -0.222 0.721">
       <freejoint name="ball_free"/>
-      <geom name="ball_geom" type="sphere" size="0.02" mass="0.05"
+      <!-- Training ball: 4 cm radius, 50 g mass. -->
+      <geom name="ball_geom" type="sphere" size="0.04" mass="0.05"
             contype="2" conaffinity="2" rgba="1 0.4 0.1 1"/>
     </body>
 
