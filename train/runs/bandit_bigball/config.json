@@ -1,0 +1,21 @@
+{
+  "algorithm": "TD3-bandit",
+  "task": "one-step release-timing aim (walk+throw rolled out per step)",
+  "target_r": [
+    3.3,
+    5.0
+  ],
+  "target_theta": [
+    0.0,
+    0.0
+  ],
+  "release_window": 0.0055,
+  "release_center_offset": 0.781,
+  "learning_rate": 0.001,
+  "batch_size": 256,
+  "sigma": 0.4,
+  "num_envs": 8,
+  "seed": 0,
+  "torch": "2.11.0+cu128",
+  "python": "3.13.7"
+}
