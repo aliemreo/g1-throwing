@@ -2,12 +2,11 @@
 
 **A Unitree G1 humanoid that walks and throws a ball to a target, learning *when to release* to hit a distance that changes every episode — generalizing across a 3.3–5.0 m band with a mean miss of 0.18 m and a 100 % hit rate within 0.5 m, and never falling.**
 
-This bundle is the runnable "final version" of the project. It contains three trained controllers and everything needed to view them in the MuJoCo physics simulator.
+This bundle is the runnable "final version" of the project. It contains two trained controllers and everything needed to view them in the MuJoCo physics simulator.
 
 | Controller | Task | What it demonstrates |
 |---|---|---|
 | **`bandit_bigball`** | Walk forward and throw at a **changing target** | *Aiming*: one policy that picks the release timing to hit any distance in 3.3–5.0 m |
-| **`throw_v6`** | Accurate **standing throw** (pelvis pinned) | The high-accuracy throwing primitive the walking controller is built on |
 | **`td3_throw_human`** | **Standing throw learned from scratch** (pelvis pinned) | *Pure RL*: discovers the whole throwing swing from a landing-error reward alone — **no scripted motion** — with a human-range elbow (no hyperextension) |
 
 ---
@@ -102,11 +101,8 @@ During the bandit's inner rollout the body throws the **fixed nominal motion** (
 
   For `bandit_bigball`: `release_center_offset = 0.781 s`, `release_window = 0.0055 s` — calibrated so that action ∈ [−1, 1] maps smoothly onto the whole 3.3–5.0 m landing band.
 
-### `throw_v6` — the throwing primitive
-`throw_v6` is the standalone high-accuracy throw (`env.py: ThrowEnv`) with the **pelvis pinned** (`freeze_legs=True`) on `models/throw_scene.xml`. Its reward has a **single objective — landing accuracy** (potential-shaped during flight, replaced by the true landing error at episode end; there are no pose, energy, survival, or bonus terms). Trained ~5 M steps with TD3, it is the accurate swing that the walking controller's nominal throw was calibrated from.
-
-### `td3_throw_human` — the throw learned from scratch (pure RL)
-`td3_throw_human` uses the same pinned `ThrowEnv`, but is trained **from scratch with no scripted swing** (`train_td3.py --no-warmstart`): a zero policy does not throw at all — the ball just drops at the robot's feet — so RL must *discover* the entire windup-and-swing purely from the landing-error reward. It adds one constraint that a reward-only throw otherwise exploits: the **elbow cannot hyperextend** (`--elbow-min 0.0` clamps the elbow lower limit to 0 rad = straight), so the learned motion stays in a human range instead of bending backwards past straight. Trained with TD3 for 400 k steps; the checkpoint promoted to `best_model` (200 k steps) lands **0.35 m from a 4 m target, 100 % within 0.5 m** (deterministic, seed-independent). `runs/td3_throw_human/` keeps the full checkpoint history and `config.json`; a companion run `runs/td3_throw_human_fine/` (checkpoints every 25 k) backs the learning-progression video in `out_videos/`.
+### `td3_throw_human` — the standing throw learned from scratch (pure RL)
+`td3_throw_human` is a pinned-base standing throw (`env.py: ThrowEnv`, `freeze_legs=True` on `models/throw_scene.xml`) trained **from scratch with no scripted swing** (`train_td3.py --no-warmstart`): a zero policy does not throw at all — the ball just drops at the robot's feet — so RL must *discover* the entire windup-and-swing purely from the landing-error reward (potential-shaped during flight, replaced by the true landing error at episode end; there are no pose, energy, survival, or bonus terms). It adds one constraint that a reward-only throw otherwise exploits: the **elbow cannot hyperextend** (`--elbow-min 0.0` clamps the elbow lower limit to 0 rad = straight), so the learned motion stays in a human range instead of bending backwards past straight. Trained with TD3 for 400 k steps; the checkpoint promoted to `best_model` (200 k steps) lands **0.35 m from a 4 m target, 100 % within 0.5 m** (deterministic, seed-independent). `runs/td3_throw_human/` keeps the full checkpoint history and `config.json`; a companion run `runs/td3_throw_human_fine/` (checkpoints every 25 k) backs the learning-progression video in `out_videos/`.
 
 ## 5. Results
 
@@ -136,25 +132,26 @@ Its value is as much qualitative as quantitative: `out_videos/throw_human_learni
 ## 6. Repository layout
 
 ```
-final_version/
+g1-throwing/                          # repository root
 ├── README.md
+├── requirements.txt
 ├── train/
-│   ├── view_bandit.py                # viewer/eval for the changing-target aiming sim
+│   ├── view_bandit.py                # viewer for the changing-target aiming sim
+│   ├── train_release_bandit.py       # trains the bandit (release = f(distance))
 │   ├── release_bandit_env.py         # 1-step contextual-bandit wrapper (the key idea)
 │   ├── walking_throw_env.py          # MuJoCo walk+throw environment (24-D action, 50 Hz)
 │   ├── walk_policy.py                # loads the pretrained LSTM walking policy
 │   ├── env.py                        # ThrowEnv: pinned-base throw (supports --elbow-min)
 │   ├── gym_env.py                    # Gym wrapper for ThrowEnv
-│   ├── train_td3.py                  # standing-throw training script (--no-warmstart, --elbow-min)
-│   ├── eval_td3.py                   # viewer/eval for the standing throws (throw_v6, td3_throw_human)
+│   ├── train_td3.py                  # trains the from-scratch standing throw (--no-warmstart, --elbow-min)
+│   ├── eval_td3.py                   # viewer/eval for the standing throw (td3_throw_human)
 │   ├── plot_throw_ablation.py        # top-down ablation: no-RL (ball drops) vs RL (learned throw)
 │   ├── record_learning_timelapse.py  # renders the from-scratch learning timelapse
 │   ├── out_videos/
 │   │   └── throw_human_learning_timelapse.mp4   # RL discovering the throw, 25k→400k
 │   └── runs/
 │       ├── bandit_bigball/           # best_model.zip + config.json (aiming)
-│       ├── throw_v6/                 # final.zip + vecnorm.pkl (standing throw)
-│       ├── td3_throw_human/          # best_model.zip + vecnorm + config.json + checkpoints (pure-RL human throw)
+│       ├── td3_throw_human/          # best_model + vecnorm + config.json + checkpoints (pure-RL throw)
 │       └── td3_throw_human_fine/     # 25k-spaced checkpoints backing the timelapse
 ├── models/
 │   ├── walk_throw_scene.xml          # scene for the walk+throw task
@@ -168,17 +165,18 @@ All scripts resolve assets by **relative path from the repo root**, so this dire
 
 ## 7. Installation
 
-Requires Python 3.13 and:
+Requires Python 3.13. Install dependencies:
 
 ```bash
-pip install mujoco stable-baselines3 torch gymnasium numpy
+pip install -r requirements.txt
+# or: pip install mujoco stable-baselines3 torch gymnasium numpy
 ```
 
 (CPU is sufficient to *view* the policies; a GPU was used only for training.)
 
 ## 8. Running the simulations
 
-Run from inside `final_version/train/`.
+Run from inside `train/`.
 
 ### Changing-target aiming (`bandit_bigball`)
 ```bash
@@ -194,13 +192,9 @@ python view_bandit.py --run bandit_bigball --mode baseline
 After each throw the viewer prints, e.g.:
 `[RL policy]  target=4.50 m  ->  threw to 4.47 m  (HIT by 0.03 m)`
 
-### Standing throw (`throw_v6`)
+Retrain it yourself (exact hyperparameters are recorded in `runs/bandit_bigball/config.json`; run with `--help` for all flags):
 ```bash
-# Watch the throw (loads final.zip; --target sets where to aim)
-python eval_td3.py --run throw_v6 --view --target 4.0 0.0
-
-# Quantitative evaluation over 50 episodes (no viewer)
-python eval_td3.py --run throw_v6 --episodes 50
+python train_release_bandit.py --name bandit_bigball --steps 6000
 ```
 
 ### Pure-RL human throw (`td3_throw_human`)
@@ -217,7 +211,7 @@ python plot_throw_ablation.py --run td3_throw_human
 # Re-render the learning timelapse (needs: pip install imageio imageio-ffmpeg Pillow)
 python record_learning_timelapse.py --run td3_throw_human_fine --out out_videos/throw_human_learning_timelapse.mp4
 ```
-To **retrain it from scratch** yourself:
+Retrain it from scratch yourself:
 ```bash
 python train_td3.py --no-warmstart --target 4 0 --elbow-min 0.0 --name td3_throw_human --steps 400000
 ```
@@ -226,7 +220,7 @@ python train_td3.py --no-warmstart --target 4 0 --elbow-min 0.0 --name td3_throw
 
 - **Simulation only.** These are MuJoCo results; sim-to-real on hardware (and radiation-hardening for the hazardous-environment use case) is future work.
 - **Coarse aiming resolution** — see the note in §5.
-- **`throw_v6` ships without `config.json`/`best_model.zip`** (only `final.zip` + `vecnorm.pkl`). The evaluator loads `final` and reconstructs the env from code defaults — identical to how it runs in the source project — but its exact training target distribution is not recorded in this bundle.
+- **`td3_throw_human` is a pinned, arm-only throw** (pelvis welded, legs frozen) — it demonstrates RL discovering an accurate throwing swing, not a full-body balanced throw.
 - **Physics engine.** Behaviour is calibrated to MuJoCo; a straight port of the policy into a different engine (e.g. Unity PhysX) will not reproduce it without retraining.
 
 ## 10. Attribution
